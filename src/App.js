@@ -1,7 +1,7 @@
 
 import './App.css';
-import React, { useState, useRef } from 'react';
-import { Stage, Layer, Rect, Shape, Text } from 'react-konva';
+import React, { useState, useRef, useEffect } from 'react';
+import { Stage, Layer, Rect, Shape, Text, Group } from 'react-konva';
 import Konva from 'konva';
 
 function BaseTriangle() {
@@ -25,6 +25,9 @@ function BaseTriangle() {
 }
 
 const ro = 0;
+const WIDTH = 30;
+const X0 = 10, XL = 100, XR = 490, XM = 800; // x坐标默认间隔 与 三个托盘x坐标
+const Y0 = 10, Y1 = 455;  // y默认间隔 与 托盘y坐标
 const initialRectangles =
 {
   x: 400 - 200 * Math.cos(Math.PI / 180 * ro) + 10 * Math.sin(Math.PI / 180 * ro),
@@ -39,83 +42,241 @@ const initialRectangles =
 
 
 
+let nowStep = 0;
 function App() {
-
   const getRow = (no) => {
-    let x = Math.ceil((Math.sqrt(1 + 8 * total) - 1) / 2);
-    let row = Math.ceil((-Math.sqrt((2 * x + 1) * (2 * x + 1) - 8 * (no + 1)) + (2 * x - 1)) / 2);
-    // console.log((2 * total + 1) * (2 * total + 1) - 4 * (total * total + total - 2 * (total - no)));
-    // console.log(no, Math.floor((2 * total + 1 + Math.sqrt((2 * total + 1) * (2 * total + 1) - 4 * (total * total + total - 2 * (total - no)))) / 2))
+    let now = no - getFirst(no);
+    let num = Math.floor((nowRight - nowLeft + 1) / 3) + ((nowRight - nowLeft + 1) % 3 === 2);
+    if (getGroup(no) == 3) num = nowRight - nowLeft + 1 - num * 2;
+    let x = Math.ceil((Math.sqrt(1 + 8 * num) - 1) / 2);
+    let row = Math.ceil((-Math.sqrt((2 * x + 1) * (2 * x + 1) - 8 * (now + 1)) + (2 * x - 1)) / 2);
+    // console.log(no, "~", num, "~", x, "~", row + 1);
     if (isNaN(row)) return 0;
     return row + 1;
   }
 
-  const getShift = (no) => {
-    let x = Math.ceil((Math.sqrt(1 + 8 * total) - 1) / 2);
-    let row = Math.ceil((-Math.sqrt((2 * x + 1) * (2 * x + 1) - 8 * (no + 1)) + (2 * x - 1)) / 2);
-    if (isNaN(row)) return 0;
-    return (x + (x - row)) * row * 15;
-  }
-  const generateShapes = (total, time, row) => {
-    return [...Array(total)].map((_, i) => ({
-      id: i.toString(),
-      x: i * 40 + 10 + (7.6 - 0.4 * i) * time - getShift(i) / 25 * time,
-      y: 10 + time * (18 - ((getRow(i) - 1) * 30 / 25))
-    }));
+  const getGroup = (no, L = nowLeft, R = nowRight) => { // 获取所在组
+    if (R === L) return 0;
+    if (no < L || no > R) return 0; // 0组表示不显示
+    switch ((R - L + 1) % 3) {
+      case 0: return Math.floor((no - L) / ((R - L + 1) / 3)) + 1;
+      case 1: return Math.min(Math.floor((no - L) / ((R - L) / 3)) + 1, 3);
+      default: return Math.floor((no - L) / ((R - L + 2) / 3)) + 1;
+    }
   }
 
-  const INITIALIZE_STATE = generateShapes(0, 0, 0);
+  const getGroupFirst = (x, L = nowLeft, R = nowRight) => { // 获取第 x 组的第一个编号
+    if (!x) return 0;
+    switch ((R - L + 1) % 3) {
+      case 0: return L + (x - 1) * ((R - L + 1) / 3);
+      case 1: return L + (x - 1) * ((R - L) / 3);
+      default: return L + (x - 1) * ((R - L + 2) / 3);
+    }
+  }
+  const getFirst = (no, L = nowLeft, R = nowRight) => { // 获取所在组的第一个编号
+    let x = getGroup(no, L, R);
+    return getGroupFirst(x, L, R);
+  }
+  const getGroupLast = (x, L = nowLeft, R = nowRight) => { // 获取第 x 组的第一个编号
+    if (!x) return 0;
+    if (x == 3) return R;
+    switch ((R - L + 1) % 3) {
+      case 0: return L + x * ((R - L + 1) / 3) - 1;
+      case 1: return L + x * ((R - L) / 3) - 1;
+      default: return L + x * ((R - L + 2) / 3) - 1;
+    }
+  }
+  const getLast = (no) => { // 获取所在组的最后一个编号
+    let x = getGroup(no);
+    return getGroupLast(x);
+  }
+  const getOffset = (no) => {
+    let now = no - getFirst(no);
+    let num = Math.floor((nowRight - nowLeft + 1) / 3) + ((nowRight - nowLeft + 1) % 3 === 2);
+    if (getGroup(no) == 3) num = nowRight - nowLeft + 1 - num * 2;
+    let x = Math.ceil((Math.sqrt(1 + 8 * num) - 1) / 2);
+    let row = Math.ceil((-Math.sqrt((2 * x + 1) * (2 * x + 1) - 8 * (now + 1)) + (2 * x - 1)) / 2);
+    if (isNaN(row)) return 0;
+    return (x + (x - row)) * row * WIDTH / 2;
+  }
+  const generateTotalShapes = (time, L = nowLeft, R = nowRight) => {
+    if (nowRight - nowLeft > 1000) return [];
+    let ans = [];
+    for (let i = nowLeft; i <= nowRight; ++i) {
+      ans.push({
+        id: i.toString(),
+        x: X0 + (i - nowLeft) * (X0 + WIDTH) - time * ((getFirst(i) - nowLeft) * (X0 + WIDTH)) / animationTime,
+        y: Y0 + time * ((getGroup(i, L, R) - 1) * (Y0 + WIDTH)) / animationTime
+      });
+    }
+    return ans;
+  }
+
+  const generateGroupShapes = (time) => {
+    if (nowRight - nowLeft > 1000) return [];
+    let ans = [];
+    for (let i = nowLeft; i <= nowRight; ++i) {
+      ans.push({
+        id: i.toString(),
+        x: X0 + (i - getFirst(i)) * (X0 + WIDTH) + time * ((getGroup(i) === 2 ? XR : (getGroup(i) === 1 ? XL : XM)) - (i - getFirst(i) + 1) * X0) / animationTime - time * getOffset(i) / animationTime,
+        y: Y0 + Math.max(getGroup(i) - 1, 0) * (Y0 + WIDTH) + time * (Y1 - WIDTH * getRow(i) - Y0 - Math.max(getGroup(i) - 1, 0) * (Y0 + WIDTH)) / animationTime
+      })
+    }
+    return ans;
+  }
+
+  const generateReserveShapes = (no, time) => {
+    if (nowRight - nowLeft > 1000) return [];
+    let ans = [];
+    for (let i = nowLeft; i <= nowRight; ++i) {
+      ans.push({
+        id: i.toString(),
+        x: (i - getFirst(i)) * WIDTH + (getGroup(i) === 2 ? XR : (getGroup(i) === 1 ? XL : XM)) - getOffset(i) + (getGroup(i) === no ? (time * (X0 + (i - getFirst(i)) * (X0 + WIDTH) - ((i - getFirst(i)) * WIDTH + (getGroup(i) === 2 ? XR : (getGroup(i) === 1 ? XL : XM)) - getOffset(i))) / animationTime) : 0),
+        y: getGroup(i) === no ? (Y1 - WIDTH * getRow(i) + time * (Y0 - Y1 + WIDTH * getRow(i)) / animationTime) : (Y1 - WIDTH * getRow(i)),
+        opacity: getGroup(i) === no ? 0.8 : (0.8 / animationTime * (animationTime - time))
+      })
+    }
+    return ans;
+  }
+
+
   // Stage is a div container
   // Layer is actual canvas element (so you may have several canvases in the stage)
   // And then we have canvas shapes inside the Layer
 
   // const rectRef = React.useRef();
   const [total, setTotal] = useState(0);
+  const [nowLeft, setNowLeft] = useState(0);
+  const [nowRight, setNowRight] = useState(-1);
   const [fake, setFake] = useState(0);
   const [animationTime, setAnimationTime] = useState(25);
   const getTotalEl = useRef();
   const animationTimeEl = useRef();
+  const resultRef = useRef();
+  const nextStepRef = useRef();
 
-  const balanceEl = useRef(null);
   const [rot, setRot] = useState(0);
 
-  const [rects, setRects] = useState(INITIALIZE_STATE);
+  const [rects, setRects] = useState([]);
+
+  useEffect(() => {
+    nextStepRef.current.removeAttribute('disabled');
+    resultRef.current.innerHTML = `<p>生成了编号为 ${0} ~ ${total - 1} 的 ${total} 个硬币，其中 ${fake} 号为假币。</p>`
+    setRects(() => {
+      let x = generateTotalShapes(0);
+      return x;
+    });
+  }, [total]);
+  const GroupRect = () => {
+    for (let i = 1; i <= animationTime; ++i)setTimeout(() => { setRects(generateTotalShapes(i)); }, 1000 / 60 * i);
+  }
   const leftHeight = () => {
-    for (let i = 1; i <= animationTime; ++i)setTimeout(() => { setRot(-i / 5); }, 1000 / 60 * i);
+    for (let i = 1; i <= animationTime; ++i)setTimeout(() => { setRot(-5 * i / animationTime); }, 1000 / 60 * i);
   }
   const BackFromLeft = () => {
-    for (let i = animationTime - 1; i >= 0; --i)setTimeout(() => { setRot(-i / 5); }, 1000 / 60 * (animationTime - i));
+    for (let i = animationTime - 1; i >= 0; --i)setTimeout(() => { setRot(-5 * i / animationTime); }, 1000 / 60 * (animationTime - i));
   }
   const rightHeight = () => {
-    for (let i = 1; i <= animationTime; ++i)setTimeout(() => { setRot(i / 5); }, 1000 / 60 * i);
+    for (let i = 1; i <= animationTime; ++i)setTimeout(() => { setRot(5 * i / animationTime); }, 1000 / 60 * i);
   }
   const BackFromRight = () => {
-    for (let i = animationTime - 1; i >= 0; --i)setTimeout(() => { setRot(i / 5); }, 1000 / 60 * (animationTime - i));
+    for (let i = animationTime - 1; i >= 0; --i)setTimeout(() => { setRot(5 * i / animationTime); }, 1000 / 60 * (animationTime - i));
   }
   const Down2Left = () => {
     for (let i = 1; i <= animationTime; ++i) {
-      setTimeout(() => { setRects(generateShapes(total, i, 1)); }, 1000 / 60 * i);
+      setTimeout(() => { setRects(generateGroupShapes(i)); }, 1000 / 60 * i);
     }
+    // for (let i = 1; i <= animationTime; ++i)setTimeout(() => { setRot(-5 * i / animationTime); }, 1000 / 60 * i);
+
   }
   const Left2Up = () => {
     for (let i = animationTime - 1; i >= 0; --i) {
-      setTimeout(() => { setRects(generateShapes(total, i, 1)); }, 1000 / 60 * (animationTime - i));
+      setTimeout(() => { setRects(generateGroupShapes(i)); }, 1000 / 60 * (animationTime - i));
+    }
+  }
+  const Down2Right = () => {
+    for (let i = 1; i <= animationTime; ++i) {
+      setTimeout(() => { setRects(generateGroupShapes(i)); }, 1000 / 60 * i);
+    }
+  }
+  const Right2Up = () => {
+    for (let i = animationTime - 1; i >= 0; --i) {
+      setTimeout(() => { setRects(generateGroupShapes(i)); }, 1000 / 60 * (animationTime - i));
     }
   }
   const totalSubmit = () => {
     let t = parseInt(getTotalEl.current.value);
-    setTotal(t);
     setFake(parseInt(Math.floor(Math.random() * t)));
-    setRects(generateShapes(parseInt(getTotalEl.current.value), 0, 0));
+    setNowRight(t - 1);
+    setNowLeft(0);
+    setTotal(t);
+    nowStep = 0;
   }
   const animationTimeSubmit = () => {
     setAnimationTime(parseInt(animationTimeEl.current.value));
+  }
+  const nextStep = () => {
+    let fakeGroup;
+    switch (nowStep % 3) {
+      case 0: // 分组阶段
+        GroupRect();
+        resultRef.current.innerHTML += `<p>第 ${nowStep} 步：将编号为 ${nowLeft} ~ ${nowRight} 的硬币分成三组：${getGroupFirst(1)} ~ ${getGroupLast(1)}、${getGroupFirst(2)} ~ ${getGroupLast(2)}、${getGroupFirst(3)} ~ ${getGroupLast(3)}。</p>`;
+        ++nowStep;
+        break;
+      case 1: // 称量阶段
+        fakeGroup = getGroup(fake);
+        let orz = '天平平衡';
+        if (fakeGroup == 2) { orz = '天平向左倾斜'; leftHeight(); }
+        if (fakeGroup == 1) { orz = '天平向左倾斜'; rightHeight(); }
+        Down2Left();
+        resultRef.current.innerHTML += `<p>第 ${nowStep} 步：将第 1 组编号为 ${getGroupFirst(1)}~${getGroupLast(1)} 的硬币和第 2 组编号为 ${getGroupFirst(2)}~${getGroupLast(2)} 的硬币放到机器上称量，${orz}，说明假币在第 ${fakeGroup} 组。</p>`;
+        ++nowStep;
+        break;
+      case 2: // 丢弃阶段
+        fakeGroup = getGroup(fake);
+        if (fakeGroup == 2) BackFromLeft();
+        if (fakeGroup == 1) BackFromRight();
+        Reserve(fakeGroup);
+        resultRef.current.innerHTML += `<p>第 ${nowStep} 步：将第 ${fakeGroup} 组编号为 ${getGroupFirst(fakeGroup)} ~ ${getGroupLast(fakeGroup)} 的硬币保留，${(getGroupFirst(fakeGroup) == getGroupLast(fakeGroup)) ? '作为进入下一次递归的硬币，' : ''}其他硬币丢弃。</p>`;
+        if (getGroupFirst(fakeGroup) == getGroupLast(fakeGroup)) {
+          nextStepRef.current.setAttribute('disabled', 'disabled');
+          resultRef.current.innerHTML += `<p>通过 ${(nowStep + 1) / 3} 次比较，成功找到假币为 ${fake} 号。</p>`;
+        }
+        ++nowStep;
+        break;
+    }
+  }
+
+  const Reserve = (group) => {
+    for (let i = 1; i <= animationTime; ++i) setTimeout(() => { setRects(generateReserveShapes(group, i)); }, 1000 / 60 * i);
+    setTimeout(() => {
+      setNowRight(getGroupLast(group));
+      setNowLeft(getGroupFirst(group));
+    }, (animationTime + 1) * 1000 / 60);
+  }
+
+  const download = (filename, text) => {
+    var element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+    element.setAttribute('download', filename);
+
+    element.style.display = 'none';
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+  }
+
+
+  const save2File = () => {
+    download('result.txt', resultRef.current.innerText);
   }
   return (
     <>
       <div>
         硬币个数：
-        <input type='text' ref={getTotalEl} defaultValue="21" />
+        <input type='text' ref={getTotalEl} defaultValue="28" />
         个
         <button type='submit' onClick={totalSubmit}>更新</button>
       </div>
@@ -126,6 +287,9 @@ function App() {
         <button type='submit' onClick={animationTimeSubmit}>更新</button>
       </div>
       <div>
+        <button onClick={GroupRect}>
+          Group
+        </button>
         <button onClick={leftHeight}>
           left Height
         </button>
@@ -139,56 +303,123 @@ function App() {
           Back From Right
         </button>
       </div>
-      <button onClick={Down2Left}>
-        Down to Left
+      <div>
+        <button onClick={() => { Reserve(1) }}>
+          保留第一组
+        </button>
+        <button onClick={() => { Reserve(2) }}>
+          保留第二组
+        </button>
+        <button onClick={() => { Reserve(3) }}>
+          保留第三组
+        </button>
+        <button onClick={Down2Left}>
+          Down to Left
+        </button>
+        <button onClick={Left2Up}>
+          Left to Up
+        </button>
+        <button onClick={Down2Right}>
+          Down to Right
+        </button>
+        <button onClick={Right2Up}>
+          Right to Up
+        </button>
+      </div>
+      <button onClick={nextStep} ref={nextStepRef}>
+        下一步
       </button>
-      <button onClick={Left2Up}>
-        Left to Up
-      </button>
-      {/* <button onClick={Down2Right}>
-        Down to Right
-      </button> */}
-      <Stage width={window.innerWidth} height={window.innerHeight}>
-        <Layer>
-          {rects.map((rect) => (
+      <div>
+        <Stage style={{ display: 'inline-block', verticalAlign: 'top' }} width={window.innerWidth * 0.7} height={window.innerHeight - 23 * 5} >
+          <Layer>
+            {rects.map((rect) => (
+              <Rect
+                key={rect.id}
+                id={rect.id}
+                x={rect.x}
+                y={rect.y + (getGroup(parseInt(rect.id)) === 1 ? -1 : (getGroup(parseInt(rect.id)) === 2 ? 1 : 0)) * (200 * Math.sin(Math.PI / 180 * rot) - 10 * (1 - Math.cos(Math.PI / 180 * rot)))}
+                width={WIDTH}
+                height={WIDTH}
+                fill={(parseInt(rect.id) === fake) ? "#FF4000" : "#00BFFF"}
+                shadowBlur={2}
+                shadowOpacity={0.5}
+                opacity={('opacity' in rect) ? rect.opacity : 0.8}
+              />
+            ))}
+            {rects.map((rect) => (
+              <Text
+                x={rect.x + 3}
+                y={rect.y + 7 + (getGroup(parseInt(rect.id)) === 1 ? -1 : (getGroup(parseInt(rect.id)) === 2 ? 1 : 0)) * (200 * Math.sin(Math.PI / 180 * rot) - 10 * (1 - Math.cos(Math.PI / 180 * rot)))}
+                text={rect.id}
+                fontSize={16}
+                fill="white"
+                opacity={('opacity' in rect) ? rect.opacity : 1}
+              >
+              </Text>
+            ))}
+            <BaseTriangle />
+
             <Rect
-              key={rect.id}
-              id={rect.id}
-              x={rect.x}
-              y={rect.y}
-              width={30}
+              x={200}
+              y={475 - 200 * Math.sin(Math.PI / 180 * rot) - 10 * Math.cos(Math.PI / 180 * rot)}
+              width={10}
               height={30}
-              fill={(parseInt(rect.id) == fake) ? "#FF4000" : "#00BFFF"}
-              shadowBlur={2}
-              shadowOpacity={0.5}
-              opacity={0.8}
+              fill='#00BFFF'
+              id='leftSupport'
+              stroke=""
+              shadowBlur={1}
             />
-          ))}
-          {rects.map((rect) => (
-            <Text
-              x={rect.x + 5}
-              y={rect.y + 7}
-              text={rect.id}
-              fontSize={16}
-              fill="white"
-            >
-            </Text>
-          ))}
-          <BaseTriangle />
-          <Rect
-            x={400 - 200 * Math.cos(Math.PI / 180 * rot) + 10 * Math.sin(Math.PI / 180 * rot)}
-            y={500 - 200 * Math.sin(Math.PI / 180 * rot) - 10 * Math.cos(Math.PI / 180 * rot)}
-            width={400}
-            height={10}
-            fill='#00BFFF'
-            id='rect1'
-            rotation={rot}
-            stroke=""
-            shadowBlur={1}
-            ref={balanceEl}
-          />
-        </Layer>
-      </Stage>
+            <Rect
+              x={100}
+              y={465 - 200 * Math.sin(Math.PI / 180 * rot) - 10 * Math.cos(Math.PI / 180 * rot)}
+              width={210}
+              height={10}
+              fill='#00BFFF'
+              id='leftPlate'
+              stroke=""
+              shadowBlur={1}
+            />
+            <Rect
+              x={590}
+              y={475 + 200 * Math.sin(Math.PI / 180 * rot) - 10 * Math.cos(Math.PI / 180 * rot)}
+              width={10}
+              height={30}
+              fill='#00BFFF'
+              id='rightSupport'
+              stroke=""
+              shadowBlur={1}
+            />
+            <Rect
+              x={490}
+              y={465 + 200 * Math.sin(Math.PI / 180 * rot) - 10 * Math.cos(Math.PI / 180 * rot)}
+              width={210}
+              height={10}
+              fill='#00BFFF'
+              id='rightPlate'
+              stroke=""
+              shadowBlur={1}
+            />
+            <Rect
+              x={400 - 200 * Math.cos(Math.PI / 180 * rot) + 10 * Math.sin(Math.PI / 180 * rot)}
+              y={500 - 200 * Math.sin(Math.PI / 180 * rot) - 10 * Math.cos(Math.PI / 180 * rot)}
+              width={400}
+              height={10}
+              fill='#00BFFF'
+              id='rect1'
+              rotation={rot}
+              stroke=""
+              shadowBlur={1}
+            />
+
+          </Layer>
+        </Stage>
+        <div style={{ display: 'inline-block', verticalAlign: 'top', paddingLeft: window.innerWidth * 0.03, maxWidth: window.innerWidth * 0.25 }} >
+          <div ref={resultRef}>
+
+          </div>
+          <button onClick={save2File} >保存结果到文本文件</button>
+        </div>
+      </div>
     </>
   );
 }

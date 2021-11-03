@@ -1,8 +1,7 @@
 
 import './App.css';
 import React, { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Rect, Shape, Text, Group } from 'react-konva';
-import Konva from 'konva';
+import { Stage, Layer, Rect, Shape, Text} from 'react-konva';
 
 function BaseTriangle() {
   return (
@@ -24,21 +23,21 @@ function BaseTriangle() {
   );
 }
 
-const ro = 0;
 const WIDTH = 30;
 const X0 = 10, XL = 100, XR = 490, XM = 800; // x坐标默认间隔 与 三个托盘x坐标
 const Y0 = 10, Y1 = 455;  // y默认间隔 与 托盘y坐标
-const initialRectangles =
-{
-  x: 400 - 200 * Math.cos(Math.PI / 180 * ro) + 10 * Math.sin(Math.PI / 180 * ro),
-  y: 500 - 200 * Math.sin(Math.PI / 180 * ro) - 10 * Math.cos(Math.PI / 180 * ro),
-  width: 400,
-  height: 10,
-  fill: '#00BFFF',
-  id: 'rect1',
-  rotation: ro,
-  centeredScaling: true
-};
+// const ro = 0;
+// const initialRectangles =
+// {
+//   x: 400 - 200 * Math.cos(Math.PI / 180 * ro) + 10 * Math.sin(Math.PI / 180 * ro),
+//   y: 500 - 200 * Math.sin(Math.PI / 180 * ro) - 10 * Math.cos(Math.PI / 180 * ro),
+//   width: 400,
+//   height: 10,
+//   fill: '#00BFFF',
+//   id: 'rect1',
+//   rotation: ro,
+//   centeredScaling: true
+// };
 
 
 
@@ -47,7 +46,7 @@ function App() {
   const getRow = (no) => {
     let now = no - getFirst(no);
     let num = Math.floor((nowRight - nowLeft + 1) / 3) + ((nowRight - nowLeft + 1) % 3 === 2);
-    if (getGroup(no) == 3) num = nowRight - nowLeft + 1 - num * 2;
+    if (getGroup(no) === 3) num = nowRight - nowLeft + 1 - num * 2;
     let x = Math.ceil((Math.sqrt(1 + 8 * num) - 1) / 2);
     let row = Math.ceil((-Math.sqrt((2 * x + 1) * (2 * x + 1) - 8 * (now + 1)) + (2 * x - 1)) / 2);
     // console.log(no, "~", num, "~", x, "~", row + 1);
@@ -79,21 +78,21 @@ function App() {
   }
   const getGroupLast = (x, L = nowLeft, R = nowRight) => { // 获取第 x 组的第一个编号
     if (!x) return 0;
-    if (x == 3) return R;
+    if (x === 3) return R;
     switch ((R - L + 1) % 3) {
       case 0: return L + x * ((R - L + 1) / 3) - 1;
       case 1: return L + x * ((R - L) / 3) - 1;
       default: return L + x * ((R - L + 2) / 3) - 1;
     }
   }
-  const getLast = (no) => { // 获取所在组的最后一个编号
-    let x = getGroup(no);
-    return getGroupLast(x);
-  }
+  // const getLast = (no) => { // 获取所在组的最后一个编号
+  //   let x = getGroup(no);
+  //   return getGroupLast(x);
+  // }
   const getOffset = (no) => {
     let now = no - getFirst(no);
     let num = Math.floor((nowRight - nowLeft + 1) / 3) + ((nowRight - nowLeft + 1) % 3 === 2);
-    if (getGroup(no) == 3) num = nowRight - nowLeft + 1 - num * 2;
+    if (getGroup(no) === 3) num = nowRight - nowLeft + 1 - num * 2;
     let x = Math.ceil((Math.sqrt(1 + 8 * num) - 1) / 2);
     let row = Math.ceil((-Math.sqrt((2 * x + 1) * (2 * x + 1) - 8 * (now + 1)) + (2 * x - 1)) / 2);
     if (isNaN(row)) return 0;
@@ -161,7 +160,7 @@ function App() {
 
   useEffect(() => {
     nextStepRef.current.removeAttribute('disabled');
-    resultRef.current.innerHTML = `<p>生成了编号为 ${0} ~ ${total - 1} 的 ${total} 个硬币，其中 ${fake} 号为假币。</p>`
+    if(total > 0)resultRef.current.innerHTML = `<p>生成了编号为 ${0} ~ ${total - 1} 的 ${total} 个硬币，其中 ${fake} 号为假币。</p>`
     setRects(() => {
       let x = generateTotalShapes(0);
       return x;
@@ -226,24 +225,26 @@ function App() {
       case 1: // 称量阶段
         fakeGroup = getGroup(fake);
         let orz = '天平平衡';
-        if (fakeGroup == 2) { orz = '天平向左倾斜'; leftHeight(); }
-        if (fakeGroup == 1) { orz = '天平向左倾斜'; rightHeight(); }
+        if (fakeGroup === 2) { orz = '天平向左倾斜'; leftHeight(); }
+        if (fakeGroup === 1) { orz = '天平向左倾斜'; rightHeight(); }
         Down2Left();
         resultRef.current.innerHTML += `<p>第 ${nowStep} 步：将第 1 组编号为 ${getGroupFirst(1)}~${getGroupLast(1)} 的硬币和第 2 组编号为 ${getGroupFirst(2)}~${getGroupLast(2)} 的硬币放到机器上称量，${orz}，说明假币在第 ${fakeGroup} 组。</p>`;
         ++nowStep;
         break;
       case 2: // 丢弃阶段
         fakeGroup = getGroup(fake);
-        if (fakeGroup == 2) BackFromLeft();
-        if (fakeGroup == 1) BackFromRight();
+        if (fakeGroup === 2) BackFromLeft();
+        if (fakeGroup === 1) BackFromRight();
         Reserve(fakeGroup);
-        resultRef.current.innerHTML += `<p>第 ${nowStep} 步：将第 ${fakeGroup} 组编号为 ${getGroupFirst(fakeGroup)} ~ ${getGroupLast(fakeGroup)} 的硬币保留，${(getGroupFirst(fakeGroup) == getGroupLast(fakeGroup)) ? '作为进入下一次递归的硬币，' : ''}其他硬币丢弃。</p>`;
-        if (getGroupFirst(fakeGroup) == getGroupLast(fakeGroup)) {
+        resultRef.current.innerHTML += `<p>第 ${nowStep} 步：将第 ${fakeGroup} 组编号为 ${getGroupFirst(fakeGroup)} ~ ${getGroupLast(fakeGroup)} 的硬币保留，${(getGroupFirst(fakeGroup) === getGroupLast(fakeGroup)) ? '' : '作为进入下一次分治的硬币，'
+          }其他硬币丢弃。</p > `;
+        if (getGroupFirst(fakeGroup) === getGroupLast(fakeGroup)) {
           nextStepRef.current.setAttribute('disabled', 'disabled');
-          resultRef.current.innerHTML += `<p>通过 ${(nowStep + 1) / 3} 次比较，成功找到假币为 ${fake} 号。</p>`;
+          resultRef.current.innerHTML += `< p > 通过 ${(nowStep + 1) / 3} 次比较，成功找到假币为 ${fake} 号。</p > `;
         }
         ++nowStep;
         break;
+      default:
     }
   }
 

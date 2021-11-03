@@ -1,7 +1,7 @@
 
 import './App.css';
 import React, { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Rect, Shape, Text} from 'react-konva';
+import { Stage, Layer, Rect, Shape, Text } from 'react-konva';
 
 function BaseTriangle() {
   return (
@@ -160,7 +160,7 @@ function App() {
 
   useEffect(() => {
     nextStepRef.current.removeAttribute('disabled');
-    if(total > 0)resultRef.current.innerHTML = `<p>生成了编号为 ${0} ~ ${total - 1} 的 ${total} 个硬币，其中 ${fake} 号为假币。</p>`
+    if (total > 0) resultRef.current.innerHTML = `<p>生成了编号为 ${0} ~ ${total - 1} 的 ${total} 个硬币，其中 ${fake} 号为假币。</p>`
     setRects(() => {
       let x = generateTotalShapes(0);
       return x;
@@ -240,7 +240,7 @@ function App() {
           }其他硬币丢弃。</p > `;
         if (getGroupFirst(fakeGroup) === getGroupLast(fakeGroup)) {
           nextStepRef.current.setAttribute('disabled', 'disabled');
-          resultRef.current.innerHTML += `< p > 通过 ${(nowStep + 1) / 3} 次比较，成功找到假币为 ${fake} 号。</p > `;
+          resultRef.current.innerHTML += `<p>通过 ${(nowStep + 1) / 3} 次比较，成功找到假币为 ${fake} 号。</p > `;
         }
         ++nowStep;
         break;
